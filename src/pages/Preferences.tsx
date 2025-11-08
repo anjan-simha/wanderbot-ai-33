@@ -25,9 +25,25 @@ const TRAVEL_INTERESTS = [
   { id: "history", label: "Historical", icon: "📜" },
 ];
 
+const LANGUAGES = [
+  { code: "en-US", name: "English (US)", flag: "🇺🇸" },
+  { code: "en-GB", name: "English (UK)", flag: "🇬🇧" },
+  { code: "es-ES", name: "Spanish", flag: "🇪🇸" },
+  { code: "fr-FR", name: "French", flag: "🇫🇷" },
+  { code: "de-DE", name: "German", flag: "🇩🇪" },
+  { code: "it-IT", name: "Italian", flag: "🇮🇹" },
+  { code: "pt-BR", name: "Portuguese", flag: "🇧🇷" },
+  { code: "ja-JP", name: "Japanese", flag: "🇯🇵" },
+  { code: "zh-CN", name: "Chinese", flag: "🇨🇳" },
+  { code: "ko-KR", name: "Korean", flag: "🇰🇷" },
+  { code: "ar-SA", name: "Arabic", flag: "🇸🇦" },
+  { code: "hi-IN", name: "Hindi", flag: "🇮🇳" },
+];
+
 const Preferences = () => {
   const [homeAddress, setHomeAddress] = useState("");
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [preferredLanguage, setPreferredLanguage] = useState("en-US");
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const navigate = useNavigate();
@@ -44,12 +60,13 @@ const Preferences = () => {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('home_address, travel_preferences')
+        .select('home_address, travel_preferences, preferred_language')
         .eq('user_id', session.user.id)
         .single();
 
       if (profile) {
         if (profile.home_address) setHomeAddress(profile.home_address);
+        if (profile.preferred_language) setPreferredLanguage(profile.preferred_language);
         if (profile.travel_preferences && typeof profile.travel_preferences === 'object') {
           const prefs = profile.travel_preferences as { interests?: string[] };
           if (prefs.interests) {
@@ -101,6 +118,7 @@ const Preferences = () => {
         .from('profiles')
         .update({
           home_address: homeAddress.trim(),
+          preferred_language: preferredLanguage,
           travel_preferences: {
             interests: selectedInterests,
           },
@@ -166,6 +184,26 @@ const Preferences = () => {
               />
               <p className="text-xs text-muted-foreground">
                 Your home address will be used to calculate return journeys
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="language">Preferred Language</Label>
+              <select
+                id="language"
+                value={preferredLanguage}
+                onChange={(e) => setPreferredLanguage(e.target.value)}
+                disabled={isLoading}
+                className="w-full h-12 px-3 rounded-md border border-input bg-background text-foreground"
+              >
+                {LANGUAGES.map((lang) => (
+                  <option key={lang.code} value={lang.code}>
+                    {lang.flag} {lang.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Used for voice input/output and text display
               </p>
             </div>
 

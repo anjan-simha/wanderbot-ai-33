@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Upload, Loader2, Image as ImageIcon, Camera, TrendingUp, Volume2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserLanguage } from "@/hooks/useUserLanguage";
 
 const ImageMode = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -14,15 +15,39 @@ const ImageMode = () => {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const { language } = useUserLanguage();
 
   const speakResponse = (text: string) => {
     if ('speechSynthesis' in window) {
       setIsSpeaking(true);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+      
+      const speak = () => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.85;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        const voices = window.speechSynthesis.getVoices();
+        const langCode = language.split('-')[0];
+        
+        const perfectMatch = voices.find(v => v.lang === language);
+        const langMatch = voices.find(v => v.lang.startsWith(langCode));
+        const defaultVoice = voices.find(v => v.default);
+        
+        utterance.voice = perfectMatch || langMatch || defaultVoice || voices[0];
+        
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      };
+      
+      if (window.speechSynthesis.getVoices().length > 0) {
+        speak();
+      } else {
+        window.speechSynthesis.onvoiceschanged = speak;
+      }
     }
   };
 

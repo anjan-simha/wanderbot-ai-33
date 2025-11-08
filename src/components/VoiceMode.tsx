@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Mic, Volume2, Loader2, MicOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useUserLanguage } from "@/hooks/useUserLanguage";
 
 const VoiceMode = () => {
   const [isListening, setIsListening] = useState(false);
@@ -13,9 +14,9 @@ const VoiceMode = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
   const [micPermission, setMicPermission] = useState<'granted' | 'denied' | 'prompt'>('prompt');
-  const [retryCount, setRetryCount] = useState(0);
   const recognitionRef = useRef<any>(null);
   const { toast } = useToast();
+  const { language } = useUserLanguage();
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -41,7 +42,7 @@ const VoiceMode = () => {
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = 'en-US';
+    recognition.lang = language;
     recognition.maxAlternatives = 1;
 
     recognition.onresult = (event: any) => {
@@ -53,7 +54,6 @@ const VoiceMode = () => {
       setQuery(transcript);
       handleQuery(transcript);
       setIsListening(false);
-      setRetryCount(0);
     };
 
     recognition.onerror = (event: any) => {
@@ -176,11 +176,38 @@ const VoiceMode = () => {
   const speakResponse = (text: string) => {
     if ('speechSynthesis' in window) {
       setIsSpeaking(true);
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1;
-      utterance.onend = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
+      
+      // Wait for voices to load
+      const speak = () => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 0.85;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        // Select best voice for language
+        const voices = window.speechSynthesis.getVoices();
+        const langCode = language.split('-')[0];
+        
+        // Find best matching voice
+        const perfectMatch = voices.find(v => v.lang === language);
+        const langMatch = voices.find(v => v.lang.startsWith(langCode));
+        const defaultVoice = voices.find(v => v.default);
+        
+        utterance.voice = perfectMatch || langMatch || defaultVoice || voices[0];
+        
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        
+        window.speechSynthesis.cancel(); // Clear queue
+        window.speechSynthesis.speak(utterance);
+      };
+      
+      // Ensure voices are loaded
+      if (window.speechSynthesis.getVoices().length > 0) {
+        speak();
+      } else {
+        window.speechSynthesis.onvoiceschanged = speak;
+      }
     }
   };
 
