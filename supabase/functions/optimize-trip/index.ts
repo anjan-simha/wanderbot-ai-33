@@ -5,6 +5,101 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Helper function to check if a place is currently open using Google Maps Places API
+async function checkPlaceStatus(placeName: string, location: string, visitDurationMinutes: number): Promise<{ isOpen: boolean; willStayOpen: boolean }> {
+  const GOOGLE_MAPS_API_KEY = Deno.env.get('GOOGLE_MAPS_API_KEY');
+  
+  // If API key is not configured, assume all places are open
+  if (!GOOGLE_MAPS_API_KEY) {
+    console.log('Google Maps API key not configured - skipping real-time status check');
+    return { isOpen: true, willStayOpen: true };
+  }
+
+  try {
+    // Step 1: Find place using Text Search
+    const searchUrl = `https://places.googleapis.com/v1/places:searchText`;
+    const searchResponse = await fetch(searchUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': GOOGLE_MAPS_API_KEY,
+        'X-Goog-FieldMask': 'places.id,places.displayName,places.currentOpeningHours'
+      },
+      body: JSON.stringify({
+        textQuery: `${placeName} ${location}`,
+        locationBias: {
+          circle: {
+            center: { latitude: 0, longitude: 0 }, // Will be refined by location string
+            radius: 50000.0
+          }
+        }
+      })
+    });
+
+    if (!searchResponse.ok) {
+      console.error('Google Maps API error:', await searchResponse.text());
+      return { isOpen: true, willStayOpen: true }; // Assume open on error
+    }
+
+    const searchData = await searchResponse.json();
+    
+    if (!searchData.places || searchData.places.length === 0) {
+      console.log(`No place found for: ${placeName}`);
+      return { isOpen: true, willStayOpen: true }; // Assume open if not found
+    }
+
+    const place = searchData.places[0];
+    const openingHours = place.currentOpeningHours;
+
+    if (!openingHours) {
+      console.log(`No opening hours data for: ${placeName}`);
+      return { isOpen: true, willStayOpen: true }; // Assume open if no hours data
+    }
+
+    // Check if currently open
+    const isCurrentlyOpen = openingHours.openNow || false;
+
+    if (!isCurrentlyOpen) {
+      return { isOpen: false, willStayOpen: false };
+    }
+
+    // Check if will stay open for visit duration
+    // Parse current period to check closing time
+    const now = new Date();
+    const visitEndTime = new Date(now.getTime() + visitDurationMinutes * 60000);
+    
+    // Get today's periods
+    const todayPeriods = openingHours.periods?.filter((period: any) => {
+      const openDay = period.open?.day;
+      return openDay === now.getDay();
+    }) || [];
+
+    let willStayOpen = true;
+    
+    for (const period of todayPeriods) {
+      if (period.close) {
+        const closeHour = period.close.hour || 0;
+        const closeMinute = period.close.minute || 0;
+        const closeTime = new Date(now);
+        closeTime.setHours(closeHour, closeMinute, 0, 0);
+
+        // If place closes before visit ends, it won't stay open
+        if (closeTime < visitEndTime) {
+          willStayOpen = false;
+          break;
+        }
+      }
+    }
+
+    console.log(`Place status for ${placeName}: open=${isCurrentlyOpen}, willStayOpen=${willStayOpen}`);
+    return { isOpen: isCurrentlyOpen, willStayOpen };
+
+  } catch (error) {
+    console.error(`Error checking place status for ${placeName}:`, error);
+    return { isOpen: true, willStayOpen: true }; // Assume open on error
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -108,17 +203,57 @@ Please suggest destinations matching my preferences. Calculate travel time from 
       throw new Error('Failed to parse AI response');
     }
 
+    console.log('Destinations suggested by AI:', destinations.length);
+
+    // Check real-time operational status for all destinations
+    console.log('Checking real-time operational status...');
+    const statusChecks = await Promise.all(
+      destinations.map(async (dest: any) => {
+        const status = await checkPlaceStatus(
+          dest.name,
+          startLocation,
+          dest.visitTime || 60
+        );
+        return { ...dest, ...status };
+      })
+    );
+
+    // Filter out closed destinations
+    const openDestinations = statusChecks.filter(dest => dest.isOpen && dest.willStayOpen);
+    console.log(`Filtered destinations: ${openDestinations.length} open out of ${destinations.length} total`);
+
+    if (openDestinations.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'No open destinations available at this time',
+          optimizedRoute: [],
+          remainingTime: availableTime * 60,
+          summary: {
+            totalDestinations: 0,
+            totalVisitTime: 0,
+            totalTravelTime: 0,
+            returnTime: 0
+          },
+          skippedDestinations: statusChecks.map(d => ({ 
+            ...d, 
+            skipReason: !d.isOpen ? 'Currently closed' : 'Will close during visit' 
+          }))
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Multi-criteria scoring algorithm
     const availableMinutes = availableTime * 60;
     
     // Calculate scores for each destination
-    const scoredDestinations = destinations.map((dest: any) => {
+    const scoredDestinations = openDestinations.map((dest: any) => {
       // Normalize scores to 0-1 range
       const ratingScore = dest.rating / 5.0; // 0-1
-      const maxDistance = Math.max(...destinations.map((d: any) => d.distanceFromSource));
+      const maxDistance = Math.max(...openDestinations.map((d: any) => d.distanceFromSource));
       const distanceScore = maxDistance > 0 ? 1 - (dest.distanceFromSource / maxDistance) : 1; // 0-1, closer is better
       
-      const maxTime = Math.max(...destinations.map((d: any) => d.visitTime + d.travelTimeFromSource));
+      const maxTime = Math.max(...openDestinations.map((d: any) => d.visitTime + d.travelTimeFromSource));
       const timeScore = maxTime > 0 ? 1 - ((dest.visitTime + dest.travelTimeFromSource) / maxTime) : 1; // 0-1, faster is better
       
       const popularityScore = (dest.popularity || 5) / 10.0; // 0-1
@@ -174,7 +309,10 @@ Please suggest destinations matching my preferences. Calculate travel time from 
         optimizedRoute.push(destination);
         remainingTime = availableMinutes - completeTripTime;
       } else {
-        skippedDestinations.push(destination);
+        skippedDestinations.push({
+          ...destination,
+          skipReason: 'Insufficient time'
+        });
       }
     }
 
