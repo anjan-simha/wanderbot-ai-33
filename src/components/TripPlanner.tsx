@@ -16,6 +16,17 @@ interface Destination {
   description: string;
   visitTime: number;
   rating: number;
+  travelTime: number;
+  distance: number;
+  distanceToHome: number;
+  coordinates: { lat: number; lng: number };
+}
+
+interface Destination {
+  name: string;
+  description: string;
+  visitTime: number;
+  rating: number;
   distanceFromSource: number;
   travelTimeFromSource: number;
   distanceToSource: number;
