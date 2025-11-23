@@ -348,22 +348,6 @@ const VoiceMode = () => {
   return (
     <div className="relative flex flex-col h-full w-full items-center justify-center bg-background p-4 md:p-6">
       <div className="space-y-6">
-        <div className="text-center space-y-2">
-          <h2 className="text-2xl md:text-3xl font-bold">Voice Query</h2>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Ask about any landmark or tourist attraction
-          </p>
-          {micPermission === 'denied' && (
-            <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
-              ⚠️ Microphone access denied. Please enable it in browser settings or use the Search tab.
-            </div>
-          )}
-          {!isSupported && (
-            <div className="p-3 bg-amber-500/10 text-amber-700 rounded-lg text-sm">
-              💡 Voice input is not reliable in all browsers. We recommend using the Search tab for best results.
-            </div>
-          )}
-        </div>
 
         <div className="flex flex-col items-center gap-6">
           {!isSupported && (
