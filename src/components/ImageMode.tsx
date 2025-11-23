@@ -181,7 +181,7 @@ const ImageMode = () => {
     }
   };
 
-  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>, fromCamera: boolean = false) => {
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 20 * 1024 * 1024) {
