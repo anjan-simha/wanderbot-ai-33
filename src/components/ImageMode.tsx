@@ -270,7 +270,7 @@ const ImageMode = () => {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => handleImageUpload(e, false)}
+              onChange={handleImageUpload}
               className="hidden"
               disabled={isLoading}
             />
