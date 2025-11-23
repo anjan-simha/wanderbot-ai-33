@@ -166,15 +166,15 @@ const VoiceMode = () => {
     setResponse("");
 
     try {
-      const { data, error } = await supabase.functions.invoke('analyze-landmark', {
+      const { data, error } = await supabase.functions.invoke('handle-text-query', {
         body: { query: queryText },
       });
 
       if (error) throw error;
 
-      const landmarkInfo = data.analysis;
-      setResponse(landmarkInfo);
-      speakResponse(landmarkInfo);
+      const textResponse = data.response;
+      setResponse(textResponse);
+      speakResponse(textResponse);
     } catch (error) {
       console.error('Error analyzing landmark:', error);
       toast({
