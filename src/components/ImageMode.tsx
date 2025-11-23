@@ -197,8 +197,7 @@ const ImageMode = () => {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setSelectedImage(base64String);
-        // Use location verification for camera captures
-        analyzeImage(base64String, fromCamera);
+        analyzeImage(base64String);
       };
       reader.readAsDataURL(file);
     }
