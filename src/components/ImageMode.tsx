@@ -340,56 +340,28 @@ const ImageMode = () => {
         </div>
 
         {result && (
-          <div className="p-4 bg-accent/5 rounded-lg border border-accent/20 animate-fade-in space-y-2">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-accent" />
-                <h3 className="font-semibold text-sm">Landmark Information:</h3>
-              </div>
-              <div className="flex gap-2">
-                {isSpeaking && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={pauseSpeaking}
-                    className="gap-1"
-                  >
-                    <Pause className="w-3 h-3" />
-                    Pause
-                  </Button>
-                )}
-                {(isPaused || canResume) && (
-                  <Button
-                    size="sm"
-                    variant="default"
-                    onClick={resumeSpeaking}
-                    className="gap-1"
-                  >
-                    <Play className="w-3 h-3" />
-                    Resume Narration
-                  </Button>
-                )}
-                {(isSpeaking || isPaused || canResume) && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={stopSpeaking}
-                    className="gap-1"
-                  >
-                    <Volume2 className="w-3 h-3" />
-                    Stop
-                  </Button>
-                )}
-              </div>
+          <Card className="p-4 w-full animate-fade-in space-y-4 shadow-lg">
+            <div>
+              <h3 className="font-bold text-xl mb-2">{result.name}</h3>
+              <p className="text-base leading-relaxed">{result.summary}</p>
             </div>
-            <p className="text-sm leading-relaxed">{result}</p>
-            {confidence && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground pt-2 border-t border-accent/20">
-                <TrendingUp className="w-4 h-4" />
-                <span>Confidence: {(confidence * 100).toFixed(0)}%</span>
-              </div>
-            )}
-          </div>
+
+            <div>
+              <h4 className="font-semibold text-lg mb-2">Fun Facts</h4>
+              <ul className="list-disc list-inside space-y-1 text-base">
+                {result.fun_facts.map((fact, index) => (
+                  <li key={index}>{fact}</li>
+                ))}
+              </ul>
+            </div>
+
+            <Button
+              onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${result.coordinates.lat},${result.coordinates.lng}`, '_blank')}
+              className="w-full"
+            >
+              View on Map
+            </Button>
+          </Card>
         )}
       </div>
     </Card>
